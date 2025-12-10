@@ -8,7 +8,7 @@ def DrawText(text, Textcolor, Rectcolor, x, y, fsize):
     text = font.render(text, True, Textcolor, Rectcolor)
     textRect = text.get_rect()
     textRect.center = (x, y)
-    DISPLAYSURF.blit(text, textRect)
+    screen.blit(text, textRect)
 
 def rectangle(display, color, x, y, w, h):
     pygame.draw.rect(display, color, (x, y, w, h))
