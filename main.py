@@ -18,23 +18,36 @@ speed = 1
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
 pygame.display.set_caption('2D printer simulation')
+token = input("First X>  ")
+toX = int(token)
+token = input("First Y>  ")
+toY = int(token)
+clock = pygame.time.Clock()
+dt = clock.tick(60)
+
+
+
+#Initial frame so pygame dont shit itself gawha!
+rectangle(screen, gray, nozzleX, nozzleY, 80, 60)
+pygame.display.update()
 while True:
     # Process player inputs.
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             raise SystemExit
-        keys = pygame.key.get_pressed()
-        print(keys)
-        if keys[pygame.K_LEFT]:
-            nozzleX -= speed # Move left
-        if keys[pygame.K_RIGHT]:
-            nozzleX += speed # Move right
-        if keys[pygame.K_UP]:
-            nozzleY -= speed # Move up
-        if keys[pygame.K_DOWN]:
-            nozzleY += speed # Move down
         screen.fill('black')
+        if nozzleX != toX:
+            if nozzleX > toX:
+                nozzleX = nozzleX - round((speed*dt)/17)
+            if nozzleX < toX:
+                nozzleX = nozzleX + round((speed*dt)/17)
+        if nozzleY != toY:
+            if nozzleY > toY:
+                nozzleY = nozzleY - round((speed*dt)/17)
+            if nozzleY < toY:
+                nozzleY = nozzleY + round((speed*dt)/17)
+
         rectangle(screen, gray, nozzleX, nozzleY, 80, 60)
         pygame.display.update()
     
