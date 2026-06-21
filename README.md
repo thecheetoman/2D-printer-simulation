@@ -7,3 +7,8 @@ Features:
 - Printer simulator
 - Image slicer
 - Print visualization
+
+Current features
+- .banana file parser
+- Basic printhead movement(no printing yet)
+

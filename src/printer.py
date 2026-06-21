@@ -1,7 +1,11 @@
 class Printer:
-    def __init__(self):
-        self.x = 0
-        self.y = 0
+    def __init__(self, screen_width=800, screen_height=600):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.center_x = screen_width // 2
+        self.center_y = screen_height // 2
+        self.x = self.center_x
+        self.y = self.center_y
         self.r = 0
         self.g = 0
         self.b = 0
@@ -9,8 +13,8 @@ class Printer:
 
     def execute(self, command):
         if command[0] == "HOME":
-            self.x = 0
-            self.y = 0
+            self.x = self.center_x
+            self.y = self.center_y
 
         elif command[0] == "MOVE":
             if len(command) >= 3:
