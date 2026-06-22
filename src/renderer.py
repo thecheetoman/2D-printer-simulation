@@ -31,7 +31,11 @@ current_x = printer.center_x
 current_y = printer.center_y
 target_x = printer.center_x
 target_y = printer.center_y
-interpolation_speed = 300  # pixels per second
+
+#intrepolation speeds
+interpolation_speed = 300  # The actual variable
+nozzleup = 500
+nozzledown = 100
 
 running = True
 clock = pygame.time.Clock()
@@ -54,6 +58,10 @@ while running:
     dx = target_x - current_x
     dy = target_y - current_y
     distance = (dx**2 + dy**2)**0.5
+    if printer.pen_down:
+        interpolation_speed = nozzledown
+    else:
+        interpolation_speed = nozzleup
 
     if distance > 0.1:  # prevent jitter
         # MOVEEE
@@ -76,6 +84,7 @@ while running:
 
 
     # make it black
+    screen.fill((255, 255, 255))
     pygame.draw.circle(screen, (0, 0, 0), (int(current_x), int(current_y)), 5)
 
     pygame.display.flip()
