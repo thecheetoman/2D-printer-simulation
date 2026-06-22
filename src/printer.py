@@ -2,12 +2,12 @@ class Printer:
     def __init__(self, screen_width=800, screen_height=600):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.center_x = screen_width // 2
-        self.center_y = screen_height // 2
+        self.center_x = 700
+        self.center_y = 100
         self.x = self.center_x
         self.y = self.center_y
         self.r = 0
-        self.g = 0
+        self.g = 0                  
         self.b = 0
         self.pen_down = False
 
