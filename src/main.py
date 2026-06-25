@@ -19,6 +19,9 @@ background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 # makey printer
 printer = Printer(WIDTH, HEIGHT)
 
+# persistent canvas for extruded filament
+canvas = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+
 # new extruder
 NOZZLE_SCALE = 1.0
 NOZZLE_TIP_X = 64
@@ -59,18 +62,28 @@ target_y = printer.center_y
 
 #intrepolation speeds
 interpolation_speed = 300  # The actual variable
-nozzleup = 500
-nozzledown = 100
+nozzleup = 900
+nozzledown = 300
 
 running = True
 clock = pygame.time.Clock()
 shift_pressed = False
 started = False
 waiting_for_nozzle = False
+test_mode = False
+extrude_enabled = True
+speed_multiplier = 2.0
+infill_mode = False
 BUTTON_WIDTH = 100
 BUTTON_HEIGHT = 32
 button_rect = pygame.Rect(
     20,
+    HEIGHT - BUTTON_HEIGHT - 10,
+    BUTTON_WIDTH,
+    BUTTON_HEIGHT,
+)
+test_button_rect = pygame.Rect(
+    20 + BUTTON_WIDTH + 10,
     HEIGHT - BUTTON_HEIGHT - 10,
     BUTTON_WIDTH,
     BUTTON_HEIGHT,
@@ -92,6 +105,10 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if button_rect.collidepoint(event.pos) and not started:
                 started = True
+                test_mode = False
+                extrude_enabled = True
+                speed_multiplier = 1.0
+                infill_mode = False
                 if commands:
                     cmd = commands[current_command_index]
                     printer.execute(cmd)
@@ -103,15 +120,33 @@ while running:
                     if cmd[0] in ("START", "END"):
                         waiting_for_nozzle = True
                     current_command_index += 1
+            elif test_button_rect.collidepoint(event.pos) and not started:
+                # start test-run: 2x speed, no extrusion
+                started = True
+                test_mode = True
+                extrude_enabled = False
+                speed_multiplier = 2.0
+                if commands:
+                    cmd = commands[current_command_index]
+                    printer.execute(cmd)
+                    target_x = printer.x
+                    target_y = printer.y
+                    target_nozzle_offset = 0.0 if printer.pen_down else NOZZLE_LIFT
+                    if cmd[0] in ("START", "END"):
+                        waiting_for_nozzle = True
+                    current_command_index += 1
 
     # interpolate or something
     dx = target_x - current_x
     dy = target_y - current_y
     distance = (dx**2 + dy**2)**0.5
     if printer.pen_down:
-        interpolation_speed = nozzledown
+        # double pen-down speed when in infill mode
+        interpolation_speed = nozzledown * (2.0 if infill_mode else 1.0)
     else:
         interpolation_speed = nozzleup
+    # apply global speed multiplier (e.g., TEST runs at 2x)
+    interpolation_speed = interpolation_speed * speed_multiplier
 
     if started:
         if distance > 0.1:  # prevent jitter
@@ -119,17 +154,30 @@ while running:
             move_distance = interpolation_speed * dt
             if move_distance < distance:
                 # normalize and move
+                old_x, old_y = current_x, current_y
                 current_x += (dx / distance) * move_distance
                 current_y += (dy / distance) * move_distance
+                # draw extrusion while moving when pen is down and extrusion enabled
+                if printer.pen_down and extrude_enabled:
+                    pygame.draw.line(canvas, (printer.r, printer.g, printer.b), (old_x, old_y), (current_x, current_y), 2)
             else:
                 # reaching target store?
+                old_x, old_y = current_x, current_y
                 current_x = target_x
                 current_y = target_y
+                if printer.pen_down and extrude_enabled:
+                    pygame.draw.line(canvas, (printer.r, printer.g, printer.b), (old_x, old_y), (current_x, current_y), 2)
         else:
             # next cmd
             if current_command_index < len(commands) and not waiting_for_nozzle:
                 cmd = commands[current_command_index]
                 printer.execute(cmd)
+                # handle INFILL/DRAW commands which adjust pen-down speed
+                if cmd[0] == "INFILL":
+                    infill_mode = True
+                elif cmd[0] == "DRAW":
+                    infill_mode = False
+
                 target_x = printer.x
                 target_y = printer.y
                 # update nozzle offset target when pen state changes
@@ -139,9 +187,34 @@ while running:
                     waiting_for_nozzle = True
                 current_command_index += 1
 
+        # If we've reached the end of commands and nozzle animation finished, mark run complete
+        if started and current_command_index >= len(commands) and not waiting_for_nozzle and abs(current_x - target_x) < 0.1:
+            # remember whether this was a TEST run so we only clear canvas for tests
+            was_test = test_mode
+            # reset run state so START/TEST can be pressed again
+            started = False
+            test_mode = False
+            extrude_enabled = True
+            speed_multiplier = 1.0
+            current_command_index = 0
+            # reset printer position and nozzle
+            printer.execute(("HOME",))
+            current_x = printer.x
+            current_y = printer.y
+            target_x = printer.x
+            target_y = printer.y
+            # clear persistent extrusion canvas only for TEST runs
+            if was_test:
+                canvas.fill((0, 0, 0, 0))
+            target_nozzle_offset = NOZZLE_LIFT if not printer.pen_down else 0.0
+            current_nozzle_offset = target_nozzle_offset
+
 
     # background image i epically created
     screen.blit(background, (0, 0))
+
+    # draw persistent extrusion canvas
+    screen.blit(canvas, (0, 0))
 
     # interpolate nozzle offset towards target_nozzle_offset
     offset_delta = target_nozzle_offset - current_nozzle_offset
@@ -163,6 +236,15 @@ while running:
     button_text = button_font.render("START", True, (255, 255, 255))
     text_rect = button_text.get_rect(center=button_rect.center)
     screen.blit(button_text, text_rect)
+    # draw test button with same style
+    test_button_color = (40, 90, 160, 180) if not started else (80, 80, 80, 180)
+    test_button_surface = pygame.Surface((BUTTON_WIDTH, BUTTON_HEIGHT), pygame.SRCALPHA)
+    test_button_surface.fill(test_button_color)
+    pygame.draw.rect(test_button_surface, (255, 255, 255, 220), test_button_surface.get_rect(), width=2)
+    screen.blit(test_button_surface, test_button_rect.topleft)
+    test_button_text = button_font.render("TEST", True, (255, 255, 255))
+    test_text_rect = test_button_text.get_rect(center=test_button_rect.center)
+    screen.blit(test_button_text, test_text_rect)
 
     # draw nozzle (apply vertical offset for pen up/down)
     display_y = current_y + current_nozzle_offset
@@ -180,10 +262,10 @@ while running:
         # fallback to circle if nozzle image missing
         if shift_pressed:
             nozzle_surface = pygame.Surface((10, 10), pygame.SRCALPHA)
-            pygame.draw.circle(nozzle_surface, (0, 0, 0, 100), (5, 5), 5)
+            pygame.draw.circle(nozzle_surface, (printer.r, printer.g, printer.b, 100), (5, 5), 5)
             screen.blit(nozzle_surface, (int(current_x) - 5, int(display_y) - 5))
         else:
-            pygame.draw.circle(screen, (0, 0, 0), (int(current_x), int(display_y)), 5)
+            pygame.draw.circle(screen, (printer.r, printer.g, printer.b), (int(current_x), int(display_y)), 5)
 
     pygame.display.flip()
 

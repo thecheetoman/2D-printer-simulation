@@ -23,6 +23,10 @@ def parse_banana_file(target_file):
                     commands.append(("START",))
                 elif token[0] == "END":
                     commands.append(("END",))
+                elif token[0].upper() == "INFILL":
+                    commands.append(("INFILL",))
+                elif token[0].upper() == "DRAW":
+                    commands.append(("DRAW",))
                 elif token[0] == "COLOR":
                     commands.append(("COLOR", int(token[1]), int(token[2]), int(token[3])))
                 elif token[0] == "BED":
