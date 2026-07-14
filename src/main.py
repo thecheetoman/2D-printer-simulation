@@ -12,7 +12,7 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("2D Printer Simulator")
 
-# Load background image
+# load da background image
 background_path = os.path.join(os.path.dirname(__file__), "../assets/printbed.png")
 background = pygame.image.load(background_path)
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
@@ -51,6 +51,17 @@ if len(sys.argv) < 2:
 target_file = sys.argv[1]
 commands = parse_banana_file(target_file)
 
+# precompute move-only toolpath segments for preview
+toolpath_segments = []
+current_pos = (printer.center_x, printer.center_y)
+for cmd in commands:
+    if cmd[0] == "HOME":
+        current_pos = (printer.center_x, printer.center_y)
+    elif cmd[0] == "MOVE":
+        next_pos = (cmd[1], cmd[2])
+        toolpath_segments.append((current_pos, next_pos))
+        current_pos = next_pos
+
 # what command do when how many
 current_command_index = 0
 
@@ -74,6 +85,7 @@ test_mode = False
 extrude_enabled = True
 speed_multiplier = 2.0
 infill_mode = False
+preview_enabled = False
 BUTTON_WIDTH = 100
 BUTTON_HEIGHT = 32
 button_rect = pygame.Rect(
@@ -99,9 +111,13 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LSHIFT:
                 shift_pressed = True
+            elif event.key == pygame.K_t:
+                preview_enabled = True
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_LSHIFT:
                 shift_pressed = False
+            elif event.key == pygame.K_t:
+                preview_enabled = False
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if button_rect.collidepoint(event.pos) and not started:
                 started = True
@@ -212,6 +228,20 @@ while running:
 
     # background image i epically created
     screen.blit(background, (0, 0))
+
+    # draw path preview when enabled
+    if preview_enabled:
+        completed_moves = sum(1 for cmd in commands[:current_command_index] if cmd[0] == "MOVE")
+        moving = started and distance > 0.1 and current_command_index > 0 and commands[current_command_index - 1][0] == "MOVE"
+        current_move_segment = completed_moves - 1 if moving else None
+        for idx, (start_pos, end_pos) in enumerate(toolpath_segments):
+            if moving and idx == current_move_segment:
+                color = (255, 255, 0)
+            elif idx < (completed_moves - 1 if moving else completed_moves):
+                color = (230, 230, 230)
+            else:
+                color = (80, 80, 80)
+            pygame.draw.line(screen, color, start_pos, end_pos, 2)
 
     # draw persistent extrusion canvas
     screen.blit(canvas, (0, 0))
