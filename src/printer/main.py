@@ -13,7 +13,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("2D Printer Simulator")
 
 # load da background image
-background_path = os.path.join(os.path.dirname(__file__), "../assets/printbed.png")
+background_path = os.path.join(os.path.dirname(__file__), "../../assets/printbed.png")
 background = pygame.image.load(background_path)
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 # makey printer
@@ -27,7 +27,7 @@ NOZZLE_SCALE = 1.0
 NOZZLE_TIP_X = 64
 NOZZLE_TIP_Y = 126
 nozzle_img = None
-nozzle_path = os.path.join(os.path.dirname(__file__), "../assets/nozzle.png")
+nozzle_path = os.path.join(os.path.dirname(__file__), "../../assets/nozzle.png")
 try:
     nozzle_img = pygame.image.load(nozzle_path).convert_alpha()
     if NOZZLE_SCALE != 1.0:
