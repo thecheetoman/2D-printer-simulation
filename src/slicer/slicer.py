@@ -1,8 +1,9 @@
 import svgelements as svg
 import sys 
 import numpy
+from tqdm import tqdm  # Imported tqdm for the progress bar
 
-#check if user provided a target file
+# check if user provided a target file
 if len(sys.argv) < 2:
     print("Please provide a valid target to an SVG")
     print("EX: python3 main.py testsubject.svg")
@@ -10,7 +11,7 @@ if len(sys.argv) < 2:
 
 target_svg = sys.argv[1]
 
-#check if target file is really an svg
+# check if target file is really an svg
 if ".svg" not in target_svg:
     print("Please provide a valid target to an SVG")
     sys.exit()
@@ -22,8 +23,8 @@ def hex_to_rgb(hex_str):
     hex_str = str(hex_str).lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
-#offsets so you dont have it clipped into the corner
-xOffset = int   (input("please enter an x offset(px): "))
+# offsets so you dont have it clipped into the corner
+xOffset = int(input("please enter an x offset(px): "))
 yOffset = int(input("please enter a y offset(px): "))
 
 
@@ -33,7 +34,11 @@ def slice_svg(target):
     # list of instructions(.banana file)
     instructions = ["HOME"]
     
-    for element in targetSvgInstance.elements():
+    # Convert elements to a list so tqdm can calculate the total count and ETA
+    elements_list = list(targetSvgInstance.elements())
+    
+    # Wrap the loop in tqdm to display the progress bar
+    for element in tqdm(elements_list, desc="Slicing SVG", unit="element"):
         # ignore svg structure stuff(<svg></svg> tags and more stuff. this is irrelevant to priting)
         if not isinstance(element, (svg.Rect, svg.Circle, svg.Path, svg.Polygon, svg.Polyline, svg.Line)):
             continue
@@ -82,47 +87,59 @@ def slice_svg(target):
                 infill_spacing = 2 
                 instructions.append("START")
                 
-                # bunch o math to find intersection points for infill
-                # 1. flatten the shape into points(easier for math)
+                # --- OPTIMIZATION 1: PRE-GENERATE FLAT PERIMETER LINES ---
                 path_length = path_element.length()
-                num_samples = max(30, int(path_length / 1.0)) # 1 point per pixel for accuracy
+                num_samples = max(30, int(path_length / 1.0)) # 1 sample per pixel
+                
+                # Pre-calculate points to avoid generating them dynamically inside the loop
                 poly_points = []
                 for i in range(num_samples + 1):
                     t = i / num_samples
                     pt = path_element.point(t)
                     poly_points.append((pt.x, pt.y))
                 
+                # Group them into segments once, storing min/max X for lightning fast filtering
+                segments = []
+                for i in range(len(poly_points) - 1):
+                    p1 = poly_points[i]
+                    p2 = poly_points[i+1]
+                    if p1[0] != p2[0]: # Ignore perfectly vertical lines to prevent division by zero
+                        segments.append({
+                            'p1': p1,
+                            'p2': p2,
+                            'min_x': min(p1[0], p2[0]),
+                            'max_x': max(p1[0], p2[0])
+                        })
+                
                 going_down = True
                 
-                # move horizontally
+                # Move horizontally along the shape
                 for x in range(int(xmin) + 2, int(xmax) - 1, infill_spacing):
                     intersections = []
                     
-                    # check every line segment making up the perimeter
-                    for i in range(len(poly_points) - 1):
-                        p1 = poly_points[i]
-                        p2 = poly_points[i+1]
-                        
-                        # check if it crosses the x coordinate
-                        if min(p1[0], p2[0]) <= x <= max(p1[0], p2[0]):
-                            # div by zero check
-                            if p1[0] != p2[0]:
-                                # ty gemeni but i lowk dont understand this that much
-                                y_intersect = p1[1] + (x - p1[0]) * (p2[1] - p1[1]) / (p2[0] - p1[0])
-                                intersections.append(y_intersect)
+                    # --- OPTIMIZATION 2: FAST REJECTION FILTERING ---
+                    for seg in segments:
+                        # Instantly skip segments that don't cross this column
+                        if x < seg['min_x'] or x > seg['max_x']:
+                            continue
+                            
+                        # Quick linear interpolation since we already know it crosses
+                        p1, p2 = seg['p1'], seg['p2']
+                        y_intersect = p1[1] + (x - p1[0]) * (p2[1] - p1[1]) / (p2[0] - p1[0])
+                        intersections.append(y_intersect)
                                 
-                    # remove duplicates, sort top to bottom
+                    # Remove duplicates and sort top to bottom
                     intersections = sorted(list(set(intersections)))
                     
-                    # if line intersects once, then remove it
+                    # If the vertical line doesn't cleanly enter and exit the shape, skip it
                     if len(intersections) < 2:
                         continue
                         
-                    # get boundaries
+                    # Get precise top and bottom boundaries for this specific column
                     y_start = intersections[0] + 1
                     y_end = intersections[-1] - 1
                     
-                    # apply offsets
+                    # Apply offsets
                     offset_x_val = x + xOffset
                     offset_y_start = int(y_start) + yOffset
                     offset_y_end = int(y_end) + yOffset
@@ -137,14 +154,13 @@ def slice_svg(target):
                     going_down = not going_down # switch direction
                     
                 instructions.append("END")
-                
+                                    
     instructions.append("HOME")
     
-    # output sliced file
-    print("\n".join(instructions))
-    
-    # saving to file
+    # Save to file
+    print("\nSaving sliced instructions to sliced_output.txt...")
     with open("sliced_output.txt", "w") as f:
         f.write("\n".join(instructions))
+    print("Slicing complete!")
 
 slice_svg(target_svg)
