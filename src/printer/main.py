@@ -72,9 +72,9 @@ target_x = printer.center_x
 target_y = printer.center_y
 
 #intrepolation speeds
-interpolation_speed = 300  # The actual variable
+interpolation_speed = 1000  # The actual variable
 nozzleup = 900
-nozzledown = 900 # WAS 300 ITS LIKE THIS FOR TESTING PURPOSES
+nozzledown = 1000 # WAS 300 ITS LIKE THIS FOR TESTING PURPOSES
 
 running = True
 clock = pygame.time.Clock()
