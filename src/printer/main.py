@@ -27,7 +27,7 @@ NOZZLE_SCALE = 1.0
 NOZZLE_TIP_X = 64
 NOZZLE_TIP_Y = 126
 nozzle_img = None
-nozzle_path = os.path.join(os.path.dirname(__file__), "../..    /assets/nozzle.png")
+nozzle_path = os.path.join(os.path.dirname(__file__), "../../assets/nozzle.png")
 try:
     nozzle_img = pygame.image.load(nozzle_path).convert_alpha()
     if NOZZLE_SCALE != 1.0:
@@ -74,7 +74,7 @@ target_y = printer.center_y
 #intrepolation speeds
 interpolation_speed = 300  # The actual variable
 nozzleup = 900
-nozzledown = 300
+nozzledown = 900 # WAS 300 ITS LIKE THIS FOR TESTING PURPOSES
 
 running = True
 clock = pygame.time.Clock()
