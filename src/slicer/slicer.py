@@ -1,7 +1,7 @@
 import svgelements as svg
 import sys 
 import numpy
-from tqdm import tqdm  # Imported tqdm for the progress bar
+from tqdm import tqdm  # progress bar wizardry =D
 
 # check if user provided a target file
 if len(sys.argv) < 2:
@@ -26,7 +26,7 @@ def hex_to_rgb(hex_str):
 # offsets so you dont have it clipped into the corner
 xOffset = int(input("please enter an x offset(px): "))
 yOffset = int(input("please enter a y offset(px): "))
-
+scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%, 2.0 = 200%): "))
 
 def slice_svg(target):
     targetSvgInstance = svg.SVG.parse(target)
@@ -64,7 +64,10 @@ def slice_svg(target):
             for i in range(num_points):
                 t = i / (num_points - 1)
                 point = path_element.point(t)
-                points.append((point.x + xOffset, point.y + yOffset))
+                # --- APPLY SCALE TO COORDINATES FIRST, THEN ADD OFFSET ---
+                scaled_x = point.x * scaleFactor
+                scaled_y = point.y * scaleFactor
+                points.append((scaled_x + xOffset, scaled_y + yOffset))
             
             if len(points) > 1:
                 instructions.append(f"COLOR {stroke_color[0]} {stroke_color[1]} {stroke_color[2]}")
@@ -79,24 +82,28 @@ def slice_svg(target):
         # infill
         if fill_color:
             instructions.append(f"COLOR {fill_color[0]} {fill_color[1]} {fill_color[2]}")
+            instructions.append("INFILL")
             
             bbox = path_element.bbox() # (xmin, ymin, xmax, ymax)
             if bbox:
-                xmin, ymin, xmax, ymax = bbox
+                # --- APPLY SCALE TO THE BOUNDING BOX ---
+                xmin = bbox[0] * scaleFactor
+                ymin = bbox[1] * scaleFactor
+                xmax = bbox[2] * scaleFactor
+                ymax = bbox[3] * scaleFactor 
                 
                 infill_spacing = 2 
                 instructions.append("START")
                 
-                # --- OPTIMIZATION 1: PRE-GENERATE FLAT PERIMETER LINES ---
-                path_length = path_element.length()
-                num_samples = max(30, int(path_length / 1.0)) # 1 sample per pixel
+                path_length = path_element.length() * scaleFactor
+                num_samples = max(30, int(path_length / 1.0))
                 
-                # Pre-calculate points to avoid generating them dynamically inside the loop
                 poly_points = []
                 for i in range(num_samples + 1):
                     t = i / num_samples
                     pt = path_element.point(t)
-                    poly_points.append((pt.x, pt.y))
+                    # --- SCALING EACH POINT ---
+                    poly_points.append((pt.x * scaleFactor, pt.y * scaleFactor))
                 
                 # Group them into segments once, storing min/max X for lightning fast filtering
                 segments = []
@@ -139,7 +146,7 @@ def slice_svg(target):
                     y_start = intersections[0] + 1
                     y_end = intersections[-1] - 1
                     
-                    # Apply offsets
+                    # Apply offsets (x, y_start, and y_end are already scaled from the steps above!)
                     offset_x_val = x + xOffset
                     offset_y_start = int(y_start) + yOffset
                     offset_y_end = int(y_end) + yOffset
@@ -152,7 +159,7 @@ def slice_svg(target):
                         instructions.append(f"MOVE {offset_x_val} {offset_y_start}")
                         
                     going_down = not going_down # switch direction
-                    
+                instructions.append("DRAW")
                 instructions.append("END")
                                     
     instructions.append("HOME")
