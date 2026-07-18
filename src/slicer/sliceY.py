@@ -2,29 +2,11 @@ import svgelements as svg
 import sys 
 from tqdm import tqdm
 
-# check if user provided a target file
-if len(sys.argv) < 2:
-    print("Please provide a valid target to an SVG")
-    print("EX: python3 main.py testsubject.svg")
-    sys.exit()
-
-target_svg = sys.argv[1]
-
-# check if target file is really an svg
-if ".svg" not in target_svg:
-    print("Please provide a valid target to an SVG")
-    sys.exit()
-
 def hex_to_rgb(hex_str):
     if not hex_str:
         return (120, 125, 130) # fallback grey
     hex_str = str(hex_str).lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
-
-# user inputs
-xOffset = int(input("please enter an x offset(px): "))
-yOffset = int(input("please enter a y offset(px): "))
-scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%): "))
 
 def is_point_inside_polygon(point, polygon_points):
     """Ray casting algorithm to check if point is inside polygon"""
@@ -44,8 +26,8 @@ def is_point_inside_polygon(point, polygon_points):
     
     return inside
 
-def slice_svg(target):
-    targetSvgInstance = svg.SVG.parse(target)
+def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor):
+    targetSvgInstance = svg.SVG.parse(target_svg)
     instructions = ["HOME"]
     elements_list = list(targetSvgInstance.elements())
     
@@ -170,4 +152,21 @@ def slice_svg(target):
         f.write("\n".join(instructions))
     print("\nSlicing complete! Output saved to sliced_output.txt.")
 
-slice_svg(target_svg)
+# Standalone execution configuration
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Please provide a valid target to an SVG")
+        print("EX: python3 slicer.py testsubject.svg")
+        sys.exit()
+
+    target_svg = sys.argv[1]
+
+    if ".svg" not in target_svg:
+        print("Please provide a valid target to an SVG")
+        sys.exit()
+
+    xOffset = int(input("please enter an x offset(px): "))
+    yOffset = int(input("please enter a y offset(px): "))
+    scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%): "))
+
+    sliceYInfill(target_svg, xOffset, yOffset, scaleFactor)
