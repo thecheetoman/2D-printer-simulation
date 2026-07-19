@@ -1,6 +1,8 @@
 import pygame
 import sys
 import os
+import tkinter as tk
+from tkinter import filedialog
 from printer import Printer
 from parser import parse_banana_file
 
@@ -42,14 +44,12 @@ target_nozzle_offset = NOZZLE_LIFT if not printer.pen_down else 0.0
 current_nozzle_offset = target_nozzle_offset
 nozzle_offset_speed = 200.0  # pixels per second for offset interpolation
 
-# parse files so that i can eat dinner
-if len(sys.argv) < 2:
-    print("Error: Please provide a file path.")
-    print('Usage: python3 ./src/main.py "./examples/square.banana"')
-    sys.exit(1)
+# if a file is provided as CLI arg, load it; otherwise start empty
+commands = []
+if len(sys.argv) >= 2:
+    commands = parse_banana_file(sys.argv[1])
 
-target_file = sys.argv[1]
-commands = parse_banana_file(target_file)
+file_loaded = len(commands) > 0
 
 # precompute move-only toolpath segments for preview
 toolpath_segments = []
@@ -96,6 +96,12 @@ button_rect = pygame.Rect(
 )
 test_button_rect = pygame.Rect(
     20 + BUTTON_WIDTH + 10,
+    HEIGHT - BUTTON_HEIGHT - 10,
+    BUTTON_WIDTH,
+    BUTTON_HEIGHT,
+)
+load_button_rect = pygame.Rect(
+    20 + 2 * (BUTTON_WIDTH + 10),
     HEIGHT - BUTTON_HEIGHT - 10,
     BUTTON_WIDTH,
     BUTTON_HEIGHT,
@@ -151,6 +157,38 @@ while running:
                     if cmd[0] in ("START", "END"):
                         waiting_for_nozzle = True
                     current_command_index += 1
+            elif not file_loaded and load_button_rect.collidepoint(event.pos) and not started:
+                root = tk.Tk()
+                root.withdraw()
+                file_path = filedialog.askopenfilename(
+                    title="Select a .banana file",
+                    filetypes=[("Banana files", "*.banana"), ("All files", "*.*")]
+                )
+                root.destroy()
+                if file_path:
+                    file_loaded = True
+                    commands = parse_banana_file(file_path)
+                    toolpath_segments = []
+                    current_pos = (printer.center_x, printer.center_y)
+                    for cmd in commands:
+                        if cmd[0] == "HOME":
+                            current_pos = (printer.center_x, printer.center_y)
+                        elif cmd[0] == "MOVE":
+                            next_pos = (cmd[1], cmd[2])
+                            toolpath_segments.append((current_pos, next_pos))
+                            current_pos = next_pos
+                    current_command_index = 0
+                    printer.execute(("HOME",))
+                    current_x = printer.x
+                    current_y = printer.y
+                    target_x = printer.x
+                    target_y = printer.y
+                    canvas.fill((0, 0, 0, 0))
+                    target_nozzle_offset = NOZZLE_LIFT
+                    current_nozzle_offset = target_nozzle_offset
+                    infill_mode = False
+                    preview_enabled = False
+                    pygame.display.set_caption(f"2D Printer Simulator - {os.path.basename(file_path)}")
 
     # interpolate or something
     dx = target_x - current_x
@@ -275,6 +313,16 @@ while running:
     test_button_text = button_font.render("TEST", True, (255, 255, 255))
     test_text_rect = test_button_text.get_rect(center=test_button_rect.center)
     screen.blit(test_button_text, test_text_rect)
+    # draw load button (only visible when no file is loaded)
+    if not file_loaded:
+        load_button_color = (180, 100, 40, 180)
+        load_button_surface = pygame.Surface((BUTTON_WIDTH, BUTTON_HEIGHT), pygame.SRCALPHA)
+        load_button_surface.fill(load_button_color)
+        pygame.draw.rect(load_button_surface, (255, 255, 255, 220), load_button_surface.get_rect(), width=2)
+        screen.blit(load_button_surface, load_button_rect.topleft)
+        load_button_text = button_font.render("LOAD", True, (255, 255, 255))
+        load_text_rect = load_button_text.get_rect(center=load_button_rect.center)
+        screen.blit(load_button_text, load_text_rect)
 
     # draw nozzle (apply vertical offset for pen up/down)
     display_y = current_y + current_nozzle_offset
