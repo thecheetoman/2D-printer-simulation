@@ -71,7 +71,6 @@ def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor):
                 ymax = bbox[3] * scaleFactor
                 
                 infill_spacing = 2
-                instructions.append("START")
                 
                 # Step 1: Convert path to high-resolution polygon
                 path_length = path_element.length() * scaleFactor
@@ -87,6 +86,8 @@ def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor):
                 going_right = True
                 
                 # Scan from top to bottom
+                first_point_set = False  # Flag to track if we've set the first point
+                
                 for y in range(int(ymin) + 2, int(ymax) - 1, infill_spacing):
                     # Find all x intersections at this y level
                     intersections = []
@@ -134,13 +135,22 @@ def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor):
                             offset_x_end = int(x_end + xOffset)
                             offset_y_val = int(y + yOffset)
                             
-                            # Draw horizontal line
-                            if going_right:
+                            # For the first segment, move to first point, START, then move to second point
+                            if not first_point_set:
+                                # Move to first point without printing
                                 instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                instructions.append("START")  # Start printing
+                                first_point_set = True
+                                # Then move to second point (this will print)
                                 instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
                             else:
-                                instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
-                                instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                # For subsequent segments, move between points (already printing)
+                                if going_right:
+                                    instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                    instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
+                                else:
+                                    instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
+                                    instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
                             
                             going_right = not going_right
                     
