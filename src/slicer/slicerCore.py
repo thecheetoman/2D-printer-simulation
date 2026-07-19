@@ -26,141 +26,195 @@ def is_point_inside_polygon(point, polygon_points):
     
     return inside
 
-def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor):
+def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor, progress_callback=None):
+    """
+    Slice an SVG file and generate printer instructions.
+    
+    Args:
+        target_svg: Path to SVG file
+        xOffset: X offset in pixels
+        yOffset: Y offset in pixels
+        scaleFactor: Scale factor (1.0 = 100%)
+        progress_callback: Optional callback function(current, total) for progress updates
+    """
     targetSvgInstance = svg.SVG.parse(target_svg)
     instructions = ["HOME"]
     elements_list = list(targetSvgInstance.elements())
     
-    for element in tqdm(elements_list, desc="Slicing SVG", unit="element"):
-        if not isinstance(element, (svg.Rect, svg.Circle, svg.Path, svg.Polygon, svg.Polyline, svg.Line)):
-            continue
+    total_elements = len(elements_list)
+    processed_elements = 0
+    
+    # Use tqdm for progress bar
+    with tqdm(total=total_elements, desc="Slicing SVG", unit="element") as pbar:
+        for element in elements_list:
+            if not isinstance(element, (svg.Rect, svg.Circle, svg.Path, svg.Polygon, svg.Polyline, svg.Line)):
+                processed_elements += 1
+                pbar.update(1)
+                if progress_callback:
+                    progress_callback(processed_elements, total_elements)
+                continue
+                
+            path_element = svg.Path(element)
+            stroke_color = hex_to_rgb(element.stroke.hex) if element.stroke and element.stroke != "none" else None
+            fill_color = hex_to_rgb(element.fill.hex) if element.fill and element.fill != "none" else None
             
-        path_element = svg.Path(element)
-        stroke_color = hex_to_rgb(element.stroke.hex) if element.stroke and element.stroke != "none" else None
-        fill_color = hex_to_rgb(element.fill.hex) if element.fill and element.fill != "none" else None
-        
-        # --- PERIMETER SPLICING ---
-        if stroke_color:
-            path_length = path_element.length()
-            num_points = max(2, int(path_length / 2.0))
-            
-            points = []
-            for i in range(num_points):
-                t = i / (num_points - 1)
-                point = path_element.point(t)
-                points.append((point.x * scaleFactor + xOffset, point.y * scaleFactor + yOffset))
-            
-            if len(points) > 1:
-                instructions.append(f"COLOR {stroke_color[0]} {stroke_color[1]} {stroke_color[2]}")
-                instructions.append(f"MOVE {int(points[0][0])} {int(points[0][1])}")
-                instructions.append("START")
-                for pt in points[1:]:
-                    instructions.append(f"MOVE {int(pt[0])} {int(pt[1])}")
-                instructions.append("END")
+            # --- PERIMETER SPLICING ---
+            if stroke_color:
+                path_length = path_element.length()
+                num_points = max(2, int(path_length / 2.0))
                 
-        # --- INFILL SPLICING (IMPROVED Y-AXIS SCANLINE) ---
-        if fill_color:
-            instructions.append(f"COLOR {fill_color[0]} {fill_color[1]} {fill_color[2]}")
-            
-            bbox = path_element.bbox() 
-            if bbox:
-                # Scale boundaries upfront
-                xmin = bbox[0] * scaleFactor
-                ymin = bbox[1] * scaleFactor
-                xmax = bbox[2] * scaleFactor
-                ymax = bbox[3] * scaleFactor
+                points = []
+                for i in range(num_points):
+                    t = i / (num_points - 1)
+                    point = path_element.point(t)
+                    points.append((point.x * scaleFactor + xOffset, point.y * scaleFactor + yOffset))
                 
-                infill_spacing = 2
-                
-                # Step 1: Convert path to high-resolution polygon
-                path_length = path_element.length() * scaleFactor
-                num_samples = max(100, int(path_length / 0.3))  # High resolution
-                
-                poly_points = []
-                for i in range(num_samples + 1):
-                    t = i / num_samples
-                    pt = path_element.point(t)
-                    poly_points.append((pt.x * scaleFactor, pt.y * scaleFactor))
-                
-                # Step 2: Scan along Y axis (more stable for star shapes)
-                going_right = True
-                
-                # Scan from top to bottom
-                first_point_set = False  # Flag to track if we've set the first point
-                
-                for y in range(int(ymin) + 2, int(ymax) - 1, infill_spacing):
-                    # Find all x intersections at this y level
-                    intersections = []
+                if len(points) > 1:
+                    instructions.append(f"COLOR {stroke_color[0]} {stroke_color[1]} {stroke_color[2]}")
+                    instructions.append(f"MOVE {int(points[0][0])} {int(points[0][1])}")
+                    instructions.append("START")
+                    for pt in points[1:]:
+                        instructions.append(f"MOVE {int(pt[0])} {int(pt[1])}")
+                    instructions.append("END")
                     
-                    # Check each polygon edge for intersection with horizontal ray at y
-                    for i in range(len(poly_points)):
-                        p1 = poly_points[i]
-                        p2 = poly_points[(i + 1) % len(poly_points)]
+            # --- INFILL SPLICING (IMPROVED Y-AXIS SCANLINE) ---
+            if fill_color:
+                instructions.append(f"COLOR {fill_color[0]} {fill_color[1]} {fill_color[2]}")
+                
+                bbox = path_element.bbox() 
+                if bbox:
+                    # Scale boundaries upfront
+                    xmin = bbox[0] * scaleFactor
+                    ymin = bbox[1] * scaleFactor
+                    xmax = bbox[2] * scaleFactor
+                    ymax = bbox[3] * scaleFactor
+                    
+                    infill_spacing = 2
+                    
+                    # Step 1: Convert path to high-resolution polygon
+                    path_length = path_element.length() * scaleFactor
+                    num_samples = max(100, int(path_length / 0.3))  # High resolution
+                    
+                    poly_points = []
+                    for i in range(num_samples + 1):
+                        t = i / num_samples
+                        pt = path_element.point(t)
+                        poly_points.append((pt.x * scaleFactor, pt.y * scaleFactor))
+                    
+                    # Step 2: Scan along Y axis (more stable for star shapes)
+                    going_right = True
+                    first_point_set = False  # Flag to track if we've set the first point
+                    
+                    for y in range(int(ymin) + 2, int(ymax) - 1, infill_spacing):
+                        # Find all x intersections at this y level
+                        intersections = []
                         
-                        # Check if horizontal ray crosses this edge
-                        if (p1[1] > y) != (p2[1] > y):
-                            # Calculate x at this y
-                            x_intersect = p1[0] + (y - p1[1]) * (p2[0] - p1[0]) / (p2[1] - p1[1])
-                            intersections.append(x_intersect)
-                    
-                    # Sort intersections
-                    intersections.sort()
-                    
-                    # Remove duplicates (floating point precision)
-                    unique_intersections = []
-                    for x in intersections:
-                        if not unique_intersections or abs(x - unique_intersections[-1]) > 0.5:
-                            unique_intersections.append(x)
-                    
-                    # Need at least 2 intersections
-                    if len(unique_intersections) < 2:
-                        continue
-                    
-                    # Pair intersections: (0,1), (2,3), (4,5), etc.
-                    for i in range(0, len(unique_intersections) - 1, 2):
-                        x_start = unique_intersections[i]
-                        x_end = unique_intersections[i + 1]
-                        
-                        # Make sure start < end
-                        if x_start > x_end:
-                            x_start, x_end = x_end, x_start
-                        
-                        # Add small buffer to avoid edge artifacts
-                        x_start += 1
-                        x_end -= 1
-                        
-                        # Only draw if we have a valid range
-                        if x_end - x_start > 1:
-                            offset_x_start = int(x_start + xOffset)
-                            offset_x_end = int(x_end + xOffset)
-                            offset_y_val = int(y + yOffset)
+                        # Check each polygon edge for intersection with horizontal ray at y
+                        for i in range(len(poly_points)):
+                            p1 = poly_points[i]
+                            p2 = poly_points[(i + 1) % len(poly_points)]
                             
-                            # For the first segment, move to first point, START, then move to second point
-                            if not first_point_set:
-                                # Move to first point without printing
-                                instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
-                                instructions.append("START")  # Start printing
-                                first_point_set = True
-                                # Then move to second point (this will print)
-                                instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
-                            else:
-                                # For subsequent segments, move between points (already printing)
-                                if going_right:
+                            # Check if horizontal ray crosses this edge
+                            if (p1[1] > y) != (p2[1] > y):
+                                # Calculate x at this y
+                                x_intersect = p1[0] + (y - p1[1]) * (p2[0] - p1[0]) / (p2[1] - p1[1])
+                                intersections.append(x_intersect)
+                        
+                        # Sort intersections
+                        intersections.sort()
+                        
+                        # Remove duplicates (floating point precision)
+                        unique_intersections = []
+                        for x in intersections:
+                            if not unique_intersections or abs(x - unique_intersections[-1]) > 0.5:
+                                unique_intersections.append(x)
+                        
+                        # Need at least 2 intersections
+                        if len(unique_intersections) < 2:
+                            continue
+                        
+                        # Pair intersections: (0,1), (2,3), (4,5), etc.
+                        for i in range(0, len(unique_intersections) - 1, 2):
+                            x_start = unique_intersections[i]
+                            x_end = unique_intersections[i + 1]
+                            
+                            # Make sure start < end
+                            if x_start > x_end:
+                                x_start, x_end = x_end, x_start
+                            
+                            # Add small buffer to avoid edge artifacts
+                            x_start += 1
+                            x_end -= 1
+                            
+                            # Only draw if we have a valid range
+                            if x_end - x_start > 1:
+                                offset_x_start = int(x_start + xOffset)
+                                offset_x_end = int(x_end + xOffset)
+                                offset_y_val = int(y + yOffset)
+                                
+                                # For the first segment, move to first point, START, then move to second point
+                                if not first_point_set:
+                                    # Move to first point without printing
                                     instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                    instructions.append("START")  # Start printing
+                                    first_point_set = True
+                                    # Then move to second point (this will print)
                                     instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
                                 else:
-                                    instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
-                                    instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
-                            
-                            going_right = not going_right
-                    
-                instructions.append("END")
+                                    # For subsequent segments, move between points (already printing)
+                                    if going_right:
+                                        instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                        instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
+                                    else:
+                                        instructions.append(f"MOVE {offset_x_end} {offset_y_val}")
+                                        instructions.append(f"MOVE {offset_x_start} {offset_y_val}")
+                                
+                                going_right = not going_right
+                        
+                    instructions.append("END")
+            
+            processed_elements += 1
+            pbar.update(1)
+            if progress_callback:
+                progress_callback(processed_elements, total_elements)
                 
     instructions.append("HOME")
     
-    with open("sliced_output.txt", "w") as f:
+    with open("slicedExport.banana", "w") as f:
         f.write("\n".join(instructions))
+    
     print("\nSlicing complete! Output saved to sliced_output.txt.")
+    return True
+
+class SlicerWithProgress:
+    """Wrapper class to add progress bar functionality to the slicer"""
+    
+    def __init__(self):
+        self.progress = 0
+        self.total = 0
+        self.is_complete = False
+        self.error = None
+    
+    def update_progress(self, current, total):
+        """Update progress from callback"""
+        self.progress = current
+        self.total = total
+    
+    def slice_with_progress(self, target_svg, xOffset, yOffset, scaleFactor):
+        """Run the slicer with progress tracking"""
+        try:
+            result = sliceYInfill(
+                target_svg, 
+                xOffset, 
+                yOffset, 
+                scaleFactor,
+                progress_callback=self.update_progress
+            )
+            self.is_complete = True
+            return result
+        except Exception as e:
+            self.error = str(e)
+            raise
 
 # Standalone execution configuration
 if __name__ == "__main__":
@@ -175,8 +229,17 @@ if __name__ == "__main__":
         print("Please provide a valid target to an SVG")
         sys.exit()
 
-    xOffset = int(input("please enter an x offset(px): "))
-    yOffset = int(input("please enter a y offset(px): "))
-    scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%): "))
+    try:
+        xOffset = int(input("please enter an x offset(px): "))
+        yOffset = int(input("please enter a y offset(px): "))
+        scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%): "))
 
-    sliceYInfill(target_svg, xOffset, yOffset, scaleFactor)
+        # Use the slicer with progress bar
+        sliceYInfill(target_svg, xOffset, yOffset, scaleFactor)
+        
+    except KeyboardInterrupt:
+        print("\n\nSlicing cancelled by user.")
+        sys.exit()
+    except Exception as e:
+        print(f"\nError during slicing: {e}")
+        sys.exit()
