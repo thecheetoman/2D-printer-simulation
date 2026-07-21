@@ -144,3 +144,6 @@ Print Simulation
 - SVG files generally produce the best results when they contain vector paths rather than embedded raster images.
 - Larger or more detailed SVGs will take longer to slice.
 - The **Test** mode is useful for checking print paths without rendering the final drawing.
+
+### Note on AI
+AI was used to eliminate a few errors in the parser and write some of the slicer.
