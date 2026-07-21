@@ -426,6 +426,20 @@ class SlicerApp:
         # boundary info
         ttk.Label(scale_frame, text=f"Boundary: 50px margin").pack(side=tk.LEFT, padx=(10, 0))
         
+        # speed controls
+        speed_frame = ttk.LabelFrame(control_frame, text="Speed", padding="5")
+        speed_frame.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Label(speed_frame, text="Travel:").pack(side=tk.LEFT, padx=(5, 2))
+        self.travel_speed_var = tk.StringVar(value="900")
+        self.travel_speed_entry = ttk.Entry(speed_frame, textvariable=self.travel_speed_var, width=6)
+        self.travel_speed_entry.pack(side=tk.LEFT, padx=(0, 5))
+        
+        ttk.Label(speed_frame, text="Draw:").pack(side=tk.LEFT, padx=(5, 2))
+        self.draw_speed_var = tk.StringVar(value="300")
+        self.draw_speed_entry = ttk.Entry(speed_frame, textvariable=self.draw_speed_var, width=6)
+        self.draw_speed_entry.pack(side=tk.LEFT, padx=(0, 5))
+        
         # slice controls
         slice_frame = ttk.LabelFrame(control_frame, text="Slice", padding="5")
         slice_frame.pack(side=tk.LEFT)
@@ -547,13 +561,22 @@ class SlicerApp:
         
         params = self.canvas.get_slice_parameters()
         
+        try:
+            travel_speed = int(self.travel_speed_var.get())
+            draw_speed = int(self.draw_speed_var.get())
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Speed values must be integers.")
+            return
+        
         # confirm dialog
         if not messagebox.askyesno(
             "Confirm Slice, this may take a while",
             f"Slice SVG with:\n"
             f"X Offset: {params['xOffset']:.0f}px\n"
             f"Y Offset: {params['yOffset']:.0f}px\n"
-            f"Scale: {params['scaleFactor']:.2f}x\n\n"
+            f"Scale: {params['scaleFactor']:.2f}x\n"
+            f"Travel Speed: {travel_speed} px/sec\n"
+            f"Draw Speed: {draw_speed} px/sec\n\n"
             f"Continue?"
         ):
             return
@@ -571,7 +594,7 @@ class SlicerApp:
         # run slicing in a seperate thread to prevent gui from crashing
         thread = threading.Thread(
             target=self._run_slice,
-            args=(self.current_svg_path, params)
+            args=(self.current_svg_path, params, travel_speed, draw_speed)
         )
         thread.daemon = True
         thread.start()
@@ -581,7 +604,7 @@ class SlicerApp:
         progress = (current / total) * 100
         self.root.after(0, lambda: self.progress_var.set(progress))
     
-    def _run_slice(self, svg_path, params):
+    def _run_slice(self, svg_path, params, travel_speed=900, draw_speed=300):
         try:
             # run slice with progress callback
             success = sliceYInfill(
@@ -589,6 +612,8 @@ class SlicerApp:
                 params['xOffset'],
                 params['yOffset'],
                 params['scaleFactor'],
+                travel_speed,
+                draw_speed,
                 self._update_progress
             )
             

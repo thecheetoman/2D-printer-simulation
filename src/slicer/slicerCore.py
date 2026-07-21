@@ -26,7 +26,7 @@ def is_point_inside_polygon(point, polygon_points):
     
     return inside
 
-def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor, progress_callback=None):
+def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor, travel_speed=900, draw_speed=300, progress_callback=None):
     """
     Slice an SVG file and generate printer instructions.
     
@@ -35,10 +35,12 @@ def sliceYInfill(target_svg, xOffset, yOffset, scaleFactor, progress_callback=No
         xOffset: X offset in pixels
         yOffset: Y offset in pixels
         scaleFactor: Scale factor (1.0 = 100%)
+        travel_speed: Movement speed when pen is up (pixels/sec)
+        draw_speed: Movement speed when pen is down (pixels/sec)
         progress_callback: Optional callback function(current, total) for progress updates
     """
     targetSvgInstance = svg.SVG.parse(target_svg)
-    instructions = ["HOME"]
+    instructions = ["HOME", f"SPEED {travel_speed} {draw_speed}"]
     elements_list = list(targetSvgInstance.elements())
     
     total_elements = len(elements_list)
@@ -200,7 +202,7 @@ class SlicerWithProgress:
         self.progress = current
         self.total = total
     
-    def slice_with_progress(self, target_svg, xOffset, yOffset, scaleFactor):
+    def slice_with_progress(self, target_svg, xOffset, yOffset, scaleFactor, travel_speed=900, draw_speed=300):
         """Run the slicer with progress tracking"""
         try:
             result = sliceYInfill(
@@ -208,6 +210,8 @@ class SlicerWithProgress:
                 xOffset, 
                 yOffset, 
                 scaleFactor,
+                travel_speed,
+                draw_speed,
                 progress_callback=self.update_progress
             )
             self.is_complete = True
@@ -233,9 +237,11 @@ if __name__ == "__main__":
         xOffset = int(input("please enter an x offset(px): "))
         yOffset = int(input("please enter a y offset(px): "))
         scaleFactor = float(input("please enter a scale factor (ex: 1.0 = 100%, 0.5 = 50%): "))
+        travel_speed = int(input("please enter travel speed (pen up, px/sec, default 900): ") or "900")
+        draw_speed = int(input("please enter draw speed (pen down, px/sec, default 300): ") or "300")
 
         # Use the slicer with progress bar
-        sliceYInfill(target_svg, xOffset, yOffset, scaleFactor)
+        sliceYInfill(target_svg, xOffset, yOffset, scaleFactor, travel_speed, draw_speed)
         
     except KeyboardInterrupt:
         print("\n\nSlicing cancelled by user.")

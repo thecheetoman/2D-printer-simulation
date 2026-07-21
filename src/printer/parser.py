@@ -29,6 +29,8 @@ def parse_banana_file(target_file):
                     commands.append(("DRAW",))
                 elif token[0] == "COLOR":
                     commands.append(("COLOR", int(token[1]), int(token[2]), int(token[3])))
+                elif token[0] == "SPEED":
+                    commands.append(("SPEED", int(token[1]), int(token[2])))
                 elif token[0] == "BED":
                     commands.append(("BED", int(token[1]), int(token[2])))
         

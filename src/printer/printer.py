@@ -10,6 +10,8 @@ class Printer:
         self.g = 0                  
         self.b = 0
         self.pen_down = False
+        self.travel_speed = 900
+        self.draw_speed = 300
 
     def execute(self, command):
         if command[0] == "HOME":
@@ -28,6 +30,10 @@ class Printer:
 
         elif command[0] == "END":
             self.pen_down = False
+        elif command[0] == "SPEED":
+            if len(command) >= 3:
+                self.travel_speed = command[1]
+                self.draw_speed = command[2]
         elif command[0] == "COLOR":
             if len(command) >= 4:
                 self.r = command[1]

@@ -71,10 +71,8 @@ current_y = printer.center_y
 target_x = printer.center_x
 target_y = printer.center_y
 
-#intrepolation speeds
-interpolation_speed = 900  # The actual variable(was 900)
-nozzleup = 900
-nozzledown = 300 # WAS 300 ITS LIKE THIS FOR TESTING PURPOSES
+#intrepolation speeds (defaults from printer object, can be overridden by SPEED command)
+interpolation_speed = 900
 
 running = True
 clock = pygame.time.Clock()
@@ -196,9 +194,9 @@ while running:
     distance = (dx**2 + dy**2)**0.5
     if printer.pen_down:
         # double pen-down speed when in infill mode
-        interpolation_speed = nozzledown * (2.0 if infill_mode else 1.0)
+        interpolation_speed = printer.draw_speed * (2.0 if infill_mode else 1.0)
     else:
-        interpolation_speed = nozzleup
+        interpolation_speed = printer.travel_speed
     # apply global speed multiplier (e.g., TEST runs at 2x)
     interpolation_speed = interpolation_speed * speed_multiplier
 
