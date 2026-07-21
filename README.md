@@ -45,7 +45,8 @@ An app that allows you to "print" images on a 2D printer, complete with a slicer
  - tqdm
 
 # Quick Start
-
+## If your lazy:
+[[Download a compiled version here]([https://www.markdownguide.org](https://github.com/thecheetoman/2D-printer-simulation/releases/tag/Latest))
 ## Local Development
 
 ### 1. Clone the repository
