@@ -81,6 +81,7 @@ Launch the slicer:
 ```bash
 python ./src/slicer/main.py
 ```
+> Or just launch the exe from releases
 
 ### Using the slicer
 
@@ -101,6 +102,8 @@ Launch the printer simulator:
 ```bash
 python ./src/printer/main.py
 ```
+> Or just launch the exe from releases
+
 
 ### Using the printer
 
@@ -109,6 +112,11 @@ python ./src/printer/main.py
 3. Press **Start** to simulate a normal print.
 4. Press **Test** to perform a high-speed dry run without drawing (useful for verifying toolpaths and movement).
 > Sometimes the printer may just start printing before randomly stopping, I cannot figure out what is causing that issue, so please relaunch the printer.
+> 
+### Keybinds
+
+shift -> Make printhead transparent(so you can see the rest of your print while it is printing)
+t -> Toolpath preview(shows where the printhead is going to go)
 
 ---
 
