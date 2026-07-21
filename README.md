@@ -114,10 +114,8 @@ python ./src/printer/main.py
 > Sometimes the printer may just start printing before randomly stopping, I cannot figure out what is causing that issue, so please relaunch the printer.
 > 
 ### Keybinds
-
-shift -> Make printhead transparent(so you can see the rest of your print while it is printing)
+shift -> Make printhead transparent(so you can see the rest of your print while it is printing)  
 t -> Toolpath preview(shows where the printhead is going to go)
-
 ---
 
 ## Workflow
